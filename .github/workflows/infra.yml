@@ -33,7 +33,7 @@ jobs:
         run: terraform fmt -recursive -check "$INFRA_DIR"
 
       - name: Check tflint
-        run: tflint --chidr="$INFRA_DIR" --recursive
+        run: tflint --chdir="$INFRA_DIR" --recursive
 
       - name: Check tfsec
         run: tfsec "$INFRA_DIR"
