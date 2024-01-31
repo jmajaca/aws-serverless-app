@@ -1,4 +1,3 @@
-/*
 terraform {
   backend "s3" {
     bucket         = "jmajaca-tf"
@@ -6,5 +5,6 @@ terraform {
     encrypt        = true
     key            = "demo-api"
     region         = "eu-central-1"
+    profile        = "personal"
   }
-}*/
+}
