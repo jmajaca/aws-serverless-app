@@ -1,6 +1,12 @@
 provider "aws" {
   region = "eu-central-1"
   profile = "personal"
+
+  default_tags {
+    tags = {
+      ManagedBy = "Terraform"
+    }
+  }
 }
 /*
 terraform {
@@ -73,12 +79,12 @@ resource "aws_ecs_service" "service" {
   launch_type     = "FARGATE"  # Use FARGATE for serverless deployment
 
   network_configuration {
-    subnets = data.aws_subnets.default.ids
-    security_groups = [data.aws_security_group.default.id]
+    subnets = module.vpc.private_subnets
+    security_groups = [aws_security_group.service_sg.id]
 
     # this is tmp when using default subnets (which are public)
     # https://stackoverflow.com/a/77706446
-    assign_public_ip = true
+    # assign_public_ip = true
   }
 
   load_balancer {
@@ -93,35 +99,12 @@ resource "aws_ecs_service" "service" {
   }
 }
 
-resource "aws_security_group" "allow_all_traffic_sg" {
-    # name = "allow-all-traffic-sg"
-  description = "Security group for the ALB"
-
-  ingress {
-    description      = "Allow all traffic"
-    from_port        = 0
-    to_port          = 443
-    protocol         = "TCP"
-    cidr_blocks      = ["0.0.0.0/0"]
-    ipv6_cidr_blocks = []
-  }
-
-  egress {
-    description      = "Allow all outbound traffic"
-    from_port        = 0
-    to_port          = 0
-    protocol         = "-1"
-    cidr_blocks      = ["0.0.0.0/0"]
-    ipv6_cidr_blocks = ["::/0"]
-  }
-}
-
 resource "aws_alb" "alb" {
   name               = "my-alb"
   internal           = false
   load_balancer_type = "application"
-  security_groups    = [data.aws_security_group.default.id, aws_security_group.allow_all_traffic_sg.id]
-  subnets            = data.aws_subnets.default.ids
+  security_groups    = [aws_security_group.alb_sg.id]
+  subnets            = module.vpc.public_subnets
 }
 
 resource "aws_alb_listener" "alb_listener" {
@@ -170,7 +153,7 @@ resource "aws_alb_target_group" "alb_target_group" {
     matcher = "200"
   }
 
-  vpc_id = data.aws_vpc.default.id
+  vpc_id = module.vpc.vpc_id
 }
 
 resource "aws_sns_topic" "ecs_usage" {
@@ -199,6 +182,24 @@ resource "aws_cloudwatch_metric_alarm" "cloudwatch_metric_alarm" {
   dimensions = {
     "ClusterName" = aws_ecs_cluster.cluster.name
     "ServiceName" = aws_ecs_service.service.name
+  }
+}
+
+# TODO this has mock values for testing
+resource "aws_cloudwatch_metric_alarm" "cloudwatch_metric_alarm_alb" {
+  alarm_name = "alb 5xx"
+  alarm_description = "5xx"
+  alarm_actions       = [aws_sns_topic.ecs_usage.arn] # TODO
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  period              = 180
+  metric_name         = "HTTPCode_Target_5XX_Count"
+  namespace           = "AWS/ApplicationELB"
+  statistic           = "Sum"
+  threshold           = 2
+  dimensions = {
+    "TargetGroup" = aws_alb_target_group.alb_target_group.arn_suffix
+    "LoadBalancer" = aws_alb.alb.arn_suffix
   }
 }
 
@@ -234,3 +235,4 @@ resource "aws_appautoscaling_policy" "autoscaling_policy_cpu" {
 # - alarms +
 # - private vpc
 # - autoscaling +
+# - 5xx alarms
