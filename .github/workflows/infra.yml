@@ -66,6 +66,11 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
+      - name: Change Terraform profile
+        run: |
+          sed -i 's|profile.*|profile = "default"|g' "$INFRA_DIR/backend.tf"
+          sed -i 's|profile.*|profile = "default"|g' "$INFRA_DIR/provider.tf"
+
       - name: Apply
         run: |
           terraform -chdir="$INFRA_DIR" init

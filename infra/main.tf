@@ -31,5 +31,4 @@ module "ecs-app" {
   private_subnets = module.vpc.private_subnets
 
   alarm_emails = ["foodie.casinos-0a@icloud.com"]
-
 }
