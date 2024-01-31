@@ -50,6 +50,7 @@ jobs:
       contents: read
     env:
       AWS_REGION: eu-central-1
+      INFRA_DIR: "infra"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
