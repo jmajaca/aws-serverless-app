@@ -1,24 +1,9 @@
-provider "aws" {
-  region = "eu-central-1"
-  profile = "personal"
-
-  default_tags {
-    tags = {
-      ManagedBy = "Terraform"
-    }
-  }
+resource "aws_kms_key" "default" {
+  description         = "default-key"
+  enable_key_rotation = true
 }
-/*
-terraform {
-  backend "s3" {
-    bucket         = "jmajaca-tf"
-    dynamodb_table = "jmajaca-tf"
-    encrypt        = true
-    key            = "demo-api"
-    region         = "eu-central-1"
-  }
-}*/
 
+#tfsec:ignore:aws-cloudwatch-log-group-customer-key
 resource "aws_cloudwatch_log_group" "cloudwatch_log_group" {
   name              = "demo-api"
   retention_in_days = 1
@@ -26,21 +11,37 @@ resource "aws_cloudwatch_log_group" "cloudwatch_log_group" {
 
 resource "aws_ecr_repository" "ecr_repository" {
   name = "demo-api"
+
+  image_tag_mutability = "IMMUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  #encryption_configuration {
+  #  encryption_type = "KMS"
+  #  kms_key = aws_kms_key.default.key_id
+  #}
 }
 
 resource "aws_ecs_cluster" "cluster" {
   name = "ecs-cluster"
+
+  setting {
+    name  = "containerInsights"
+    value = "enabled"
+  }
 }
 
 resource "aws_ecs_task_definition" "task_definition" {
   family                   = "demo-api"
-  network_mode             = "awsvpc"  # Use awsvpc for Fargate launch type
+  network_mode             = "awsvpc" # Use awsvpc for Fargate launch type
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "256" 
+  cpu                      = "256"
   memory                   = "512"
 
   execution_role_arn = aws_iam_role.ecs_execution_role.arn
-  task_role_arn = aws_iam_role.ecs_execution_role.arn
+  task_role_arn      = aws_iam_role.ecs_execution_role.arn
 
   container_definitions = jsonencode([
     {
@@ -55,31 +56,32 @@ resource "aws_ecs_task_definition" "task_definition" {
       logConfiguration = {
         logDriver = "awslogs"
         options = {
-            "awslogs-group" : aws_cloudwatch_log_group.cloudwatch_log_group.name,
-            "awslogs-region" : "eu-central-1", # TODO
-            "awslogs-stream-prefix" : "ecs",
+          "awslogs-group" : aws_cloudwatch_log_group.cloudwatch_log_group.name,
+          "awslogs-region" : "eu-central-1", # TODO
+          "awslogs-stream-prefix" : "ecs",
         }
-        }
+      }
       healthCheck = {
-            retries = 3
-            # command = ["CMD-SHELL", "curl -f http://localhost:80/health || exit 1"]
-            command = ["CMD-SHELL", "echo health"]
-            timeout     = 2
-            interval    = 10
-            startPeriod = 10
-        }
+        retries = 3
+        # command = ["CMD-SHELL", "curl -f http://localhost:80/health || exit 1"]
+        command     = ["CMD-SHELL", "echo health"]
+        timeout     = 2
+        interval    = 10
+        startPeriod = 10
+      }
     },
   ])
 }
 
 resource "aws_ecs_service" "service" {
-  name            = "demo-api"
-  cluster         = aws_ecs_cluster.cluster.id
-  task_definition = aws_ecs_task_definition.task_definition.arn
-  launch_type     = "FARGATE"  # Use FARGATE for serverless deployment
+  name                              = "demo-api"
+  cluster                           = aws_ecs_cluster.cluster.id
+  task_definition                   = aws_ecs_task_definition.task_definition.arn
+  launch_type                       = "FARGATE" # Use FARGATE for serverless deployment
+  health_check_grace_period_seconds = 10
 
   network_configuration {
-    subnets = module.vpc.private_subnets
+    subnets         = module.vpc.private_subnets
     security_groups = [aws_security_group.service_sg.id]
 
     # this is tmp when using default subnets (which are public)
@@ -88,49 +90,55 @@ resource "aws_ecs_service" "service" {
   }
 
   load_balancer {
-    container_name = "demo-api"
-    container_port = 80
+    container_name   = "demo-api"
+    container_port   = 80
     target_group_arn = aws_alb_target_group.alb_target_group.arn
   }
   desired_count = 1
 
   lifecycle {
-    ignore_changes = [ desired_count ]
+    ignore_changes = [desired_count]
   }
 }
 
+#tfsec:ignore:aws-elb-alb-not-public
 resource "aws_alb" "alb" {
-  name               = "my-alb"
-  internal           = false
-  load_balancer_type = "application"
-  security_groups    = [aws_security_group.alb_sg.id]
-  subnets            = module.vpc.public_subnets
+  name                       = "my-alb"
+  internal                   = false
+  load_balancer_type         = "application"
+  security_groups            = [aws_security_group.alb_sg.id]
+  subnets                    = module.vpc.public_subnets
+  drop_invalid_header_fields = true
 }
 
-resource "aws_alb_listener" "alb_listener" {
+resource "aws_alb_listener" "http_listener" {
   load_balancer_arn = aws_alb.alb.arn
   port              = 80
-  protocol          = "HTTP"
+  protocol          = "HTTP" #tfsec:ignore:aws-elb-http-not-used
 
+  # can't use HTTPS because of no cert
+  # default_action {
+  #   type = "redirect"
+  #   redirect {
+  #     port        = "443"
+  #     protocol    = "HTTPS"
+  #     status_code = "HTTP_301"
+  #   }
+  # }
   default_action {
-    type = "fixed-response"
-    fixed_response {
-      status_code  = "200"
-      message_body = "{ \"status\": \"OK\" }"
-      content_type = "application/json"
-    }
+    type             = "forward"
+    target_group_arn = aws_alb_target_group.alb_target_group.arn
   }
 }
 
-resource "aws_alb_listener_rule" "alb_listener_rule" {
-  listener_arn = aws_alb_listener.alb_listener.arn
-  condition {
-    path_pattern {
-      values = ["/*"]
-    }
-  }
-  action {
-    type = "forward"
+resource "aws_alb_listener" "https_listener" {
+  load_balancer_arn = aws_alb.alb.arn
+  port              = 443
+  # can't use HTTPS because of no cert
+  protocol = "HTTP" #tfsec:ignore:aws-elb-http-not-used
+
+  default_action {
+    type             = "forward"
     target_group_arn = aws_alb_target_group.alb_target_group.arn
   }
 }
@@ -150,14 +158,15 @@ resource "aws_alb_target_group" "alb_target_group" {
     port                = "traffic-port"
     protocol            = "HTTP"
     path                = "/health"
-    matcher = "200"
+    matcher             = "200"
   }
 
   vpc_id = module.vpc.vpc_id
 }
 
 resource "aws_sns_topic" "ecs_usage" {
-  name = "ecs-usage"
+  name              = "ecs-usage"
+  kms_master_key_id = aws_kms_key.default.key_id
 }
 
 resource "aws_sns_topic_subscription" "ecs_usage_target" {
@@ -187,8 +196,8 @@ resource "aws_cloudwatch_metric_alarm" "cloudwatch_metric_alarm" {
 
 # TODO this has mock values for testing
 resource "aws_cloudwatch_metric_alarm" "cloudwatch_metric_alarm_alb" {
-  alarm_name = "alb 5xx"
-  alarm_description = "5xx"
+  alarm_name          = "alb 5xx"
+  alarm_description   = "5xx"
   alarm_actions       = [aws_sns_topic.ecs_usage.arn] # TODO
   comparison_operator = "GreaterThanOrEqualToThreshold"
   evaluation_periods  = 1
@@ -198,31 +207,31 @@ resource "aws_cloudwatch_metric_alarm" "cloudwatch_metric_alarm_alb" {
   statistic           = "Sum"
   threshold           = 2
   dimensions = {
-    "TargetGroup" = aws_alb_target_group.alb_target_group.arn_suffix
+    "TargetGroup"  = aws_alb_target_group.alb_target_group.arn_suffix
     "LoadBalancer" = aws_alb.alb.arn_suffix
   }
 }
 
 resource "aws_appautoscaling_target" "autoscaling_target" {
-  max_capacity = 3
-  min_capacity = 1
-  resource_id = "service/${aws_ecs_cluster.cluster.name}/${aws_ecs_service.service.name}"
+  max_capacity       = 3
+  min_capacity       = 1
+  resource_id        = "service/${aws_ecs_cluster.cluster.name}/${aws_ecs_service.service.name}"
   scalable_dimension = "ecs:service:DesiredCount"
-  service_namespace = "ecs"
+  service_namespace  = "ecs"
 }
 
 resource "aws_appautoscaling_policy" "autoscaling_policy_cpu" {
   for_each = toset(["ECSServiceAverageCPUUtilization", "ECSServiceAverageMemoryUtilization"])
 
-  name = each.key
-  policy_type = "TargetTrackingScaling"
-  resource_id = aws_appautoscaling_target.autoscaling_target.resource_id
+  name               = each.key
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = aws_appautoscaling_target.autoscaling_target.resource_id
   scalable_dimension = aws_appautoscaling_target.autoscaling_target.scalable_dimension
-  service_namespace = aws_appautoscaling_target.autoscaling_target.service_namespace
+  service_namespace  = aws_appautoscaling_target.autoscaling_target.service_namespace
 
   target_tracking_scaling_policy_configuration {
-    target_value = 80
-    scale_in_cooldown = 300
+    target_value       = 80
+    scale_in_cooldown  = 300
     scale_out_cooldown = 300
     predefined_metric_specification {
       predefined_metric_type = each.key
@@ -233,6 +242,6 @@ resource "aws_appautoscaling_policy" "autoscaling_policy_cpu" {
 # TODO list
 # - logs +
 # - alarms +
-# - private vpc
+# - private vpc +
 # - autoscaling +
-# - 5xx alarms
+# - 5xx alarms +
