@@ -68,8 +68,8 @@ jobs:
 
       - name: Change Terraform profile
         run: |
-          sed -i 's|profile.*|profile = "default"|g' "$INFRA_DIR/backend.tf"
-          sed -i 's|profile.*|profile = "default"|g' "$INFRA_DIR/provider.tf"
+          sed -i 's|profile.*||g' "$INFRA_DIR/backend.tf"
+          sed -i 's|profile.*||g' "$INFRA_DIR/provider.tf"
 
       - name: Apply
         run: |

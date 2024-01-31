@@ -45,7 +45,6 @@ resource "aws_alb_target_group" "alb_target_group" {
   port        = 80
   protocol    = "HTTP"
   target_type = "ip"
-
   health_check {
     enabled             = true
     healthy_threshold   = 3
@@ -57,7 +56,6 @@ resource "aws_alb_target_group" "alb_target_group" {
     path                = var.application_health_check_path
     matcher             = "200"
   }
-
   vpc_id = var.vpc_id
 }
 
