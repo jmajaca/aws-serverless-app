@@ -33,7 +33,11 @@ jobs:
         run: terraform fmt -recursive -check "$INFRA_DIR"
 
       - name: Check tflint
-        run: tflint --chdir="$INFRA_DIR" --recursive
+        run: |
+          CURRENT_DIR="$(pwd)"
+          cd "$INFRA_DIR"
+          tflint --recursive
+          cd "$CURRENT_DIR"
 
       - name: Check tfsec
         run: tfsec "$INFRA_DIR"
