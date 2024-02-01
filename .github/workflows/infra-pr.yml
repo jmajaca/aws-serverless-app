@@ -50,7 +50,7 @@ jobs:
         run: |
           terraform init
           OUTPUT="output=$(terraform plan)"
-          cat $OUTPUT
+          terraform plan
           echo 'RESULT<<EOF' >> $GITHUB_OUTPUT
           echo $OUTPUT >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
