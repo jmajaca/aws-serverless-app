@@ -6,7 +6,22 @@ on:
       - "infra/**"
 
 jobs:
+  debug:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/TerraformPipeline
+          role-session-name: pipeline-session
+          aws-region: eu-central-1
+
   plan:
+    # TODO
+    needs: debug
     uses: ./.github/workflows/infra-base.yml
     with:
       mode: "plan"
