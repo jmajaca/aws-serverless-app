@@ -10,3 +10,6 @@ jobs:
     uses: ./.github/workflows/infra-base.yml
     with:
       mode: "plan"
+    permissions:
+      id-token: write
+      contents: read

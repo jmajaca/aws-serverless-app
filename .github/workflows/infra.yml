@@ -12,3 +12,6 @@ jobs:
     uses: ./.github/workflows/infra-base.yml
     with:
       mode: "apply"
+    permissions:
+      id-token: write
+      contents: read
