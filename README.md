@@ -1,3 +1,2 @@
 # AWS Serverless app
 
-TODO

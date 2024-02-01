@@ -1,19 +1,25 @@
-name: CI/CD Pipeline
+name: Application Pipeline
 
 on:
   push:
     branches:
       - master
+    paths:
+      - "app/**"
+
+defaults:
+  run:
+    working-directory: ./app
 
 jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
@@ -34,10 +40,10 @@ jobs:
   # https://docs.docker.com/build/ci/github-actions/share-image-jobs/
   build:
     runs-on: ubuntu-latest
-    needs: lint
+    needs: test
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -57,24 +63,23 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    needs: build
+    needs: lint
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Install pytest
-        run: pip install pytest
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
 
       - name: Run tests
-        run: pytest tests
+        run: pytest
 
   publish:
     runs-on: ubuntu-latest
@@ -90,22 +95,46 @@ jobs:
         run: docker load --input /tmp/demo-api.tar
 
       - name: Set up AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+          aws-region: eu-central-1
 
       - name: Login to Amazon ECR
-        uses: aws-actions/amazon-ecr-login@v1
-        id: login-ecr-public
+        uses: aws-actions/amazon-ecr-login@v2
+        id: login-ecr
         with:
           mask-password: true
-          registry-type: public
-
-      - name: Tag image
-        run: docker tag demo-api:latest public.ecr.aws/d2v5d2j3/demo-api:${{ github.sha }}
 
       - name: Publish Docker image to ECR
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: demo-api
+          IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker push public.ecr.aws/d2v5d2j3/demo-api:${{ github.sha }}
+          docker tag demo-api:latest "$REGISTRY/$REPOSITORY:$IMAGE_TAG"
+          docker push "$REGISTRY/$REPOSITORY:$IMAGE_TAG"
+          docker push "$REGISTRY/$REPOSITORY:latest"
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: publish
+    steps:
+      - name: Set up AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-central-1
+      
+      # TODO check for creds + roles
+      - name: Redeploy ECS service
+        env:
+          ECS_CLUSTER: ecs-cluster
+          ECS_SERVICE: demo-api
+        run: |
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_SERVICE" \
+            --force-new-deployment

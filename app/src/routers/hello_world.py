@@ -2,7 +2,7 @@ from datetime import datetime
 
 from fastapi import APIRouter
 
-from app.schemas import HelloWorldSchema
+from src.schemas import HelloWorldSchema
 
 router = APIRouter(prefix="/hello-world")
 

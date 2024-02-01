@@ -7,11 +7,13 @@ on:
     paths:
       - "infra/**"
 
+defaults:
+  run:
+    working-directory: ./infra
+
 jobs:
   test:
     runs-on: ubuntu-latest
-    env:
-      INFRA_DIR: "infra"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -26,21 +28,17 @@ jobs:
 
       - name: Validate
         run: |
-          terraform -chdir="$INFRA_DIR" init -backend=false
-          terraform -chdir="$INFRA_DIR" validate
+          terraform init -backend=false
+          terraform validate
 
       - name: Check fmt
-        run: terraform fmt -recursive -check "$INFRA_DIR"
+        run: terraform fmt -recursive -check .
 
       - name: Check tflint
-        run: |
-          CURRENT_DIR="$(pwd)"
-          cd "$INFRA_DIR"
-          tflint --recursive
-          cd "$CURRENT_DIR"
+        run: tflint --recursive
 
       - name: Check tfsec
-        run: tfsec "$INFRA_DIR"
+        run: tfsec
 
   deploy:
     runs-on: ubuntu-latest
@@ -50,14 +48,13 @@ jobs:
       contents: read
     env:
       AWS_REGION: eu-central-1
-      INFRA_DIR: "infra"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       # https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v3
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/TerraformPipeline
           role-session-name: pipeline-session
@@ -65,13 +62,15 @@ jobs:
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.1"
 
       - name: Change Terraform profile
         run: |
-          sed -i 's|profile.*||g' "$INFRA_DIR/backend.tf"
-          sed -i 's|profile.*||g' "$INFRA_DIR/provider.tf"
+          sed -i 's|profile.*||g' "backend.tf"
+          sed -i 's|profile.*||g' "provider.tf"
 
       - name: Apply
         run: |
-          terraform -chdir="$INFRA_DIR" init
-          terraform -chdir="$INFRA_DIR" apply -auto-approve
+          terraform init
+          terraform apply -auto-approve

@@ -1,0 +1,6 @@
+isort
+black
+mypy
+ruff
+pytest==8.0.0
+httpx==0.26.0
