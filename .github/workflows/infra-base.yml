@@ -1,0 +1,82 @@
+name: Infrastructure Base Pipeline
+
+on:
+  workflow_call:
+    inputs:
+      mode:
+        required: true
+        type: string
+
+defaults:
+  run:
+    working-directory: ./infra
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Install tools
+        run: |
+          curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
+          curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash
+
+      - name: Validate
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+      - name: Check fmt
+        run: terraform fmt -recursive -check .
+
+      - name: Check tflint
+        run: tflint --recursive
+
+      - name: Check tfsec
+        run: tfsec
+
+  terraform:
+    runs-on: ubuntu-latest
+    needs: test
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      AWS_REGION: eu-central-1
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/TerraformPipeline
+          role-session-name: pipeline-session
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.1"
+
+      - name: Change Terraform profile
+        run: |
+          sed -i 's|profile.*||g' "backend.tf"
+          sed -i 's|profile.*||g' "provider.tf"
+
+      - name: Run terraform command
+        run: |
+          terraform init
+          if [[ "${{ inputs.mode }}" == "apply" ]]; then
+            terraform apply -auto-approve
+          elif [[ "${{ inputs.mode }}" == "plan" ]]; then
+            terraform plan
+          else
+            exit 1
+          fi
