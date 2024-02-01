@@ -1,0 +1,10 @@
+name: Application PR Pipeline
+
+on:
+  pull_request:
+    paths:
+      - "app/**"
+
+jobs:
+  build:
+    uses: ./.github/workflows/app-build.yml
