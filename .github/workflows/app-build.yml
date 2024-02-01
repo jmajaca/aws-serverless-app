@@ -48,7 +48,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: app
-          dockerfile: app/Dockerfile
+          # dockerfile: app/Dockerfile
           tags: demo-api:latest
           outputs: type=docker,dest=/tmp/demo-api.tar
 
