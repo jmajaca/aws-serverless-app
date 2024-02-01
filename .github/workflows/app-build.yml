@@ -28,10 +28,10 @@ jobs:
 
       - name: Lint code
         run: |
-          black --check app
-          isort --profile black app
-          mypy app
-          ruff check app
+          black --check .
+          isort --profile black .
+          mypy .
+          ruff check .
 
   # https://docs.docker.com/build/ci/github-actions/share-image-jobs/
   build:

@@ -13,7 +13,7 @@ defaults:
 
 jobs:
   build:
-    uses: ./.github/workflows/reusable/app-build.yml@main
+    uses: ./.github/workflows/reusable/app-build.yml
 
   deploy:
     runs-on: ubuntu-latest
