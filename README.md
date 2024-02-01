@@ -1,5 +1,7 @@
 # AWS Serverless app
 
+> Application is (currently) available - http://demo-api-2067803618.eu-central-1.elb.amazonaws.com/hello-world
+
 This project contains two main parts:
 - `app` - simple FastAPI Python application
 - `infra` - terraform resources for provisioning infrastructure for serverless hosting of the `app`
@@ -60,3 +62,7 @@ All workflows use OpenID Connect to authenticate with the AWS. So there are no c
 ## Graphs
 
 ![Networking](images/vpc.png)
+*Simple networking graph*
+
+![Resources](images/resources.png)
+*Graph of all resources (excluding the VPC module)*
