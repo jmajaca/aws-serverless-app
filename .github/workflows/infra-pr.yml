@@ -5,6 +5,10 @@ on:
     paths:
       - "infra/**"
 
+defaults:
+  run:
+    working-directory: ./infra
+
 jobs:
   test:
     uses: ./.github/workflows/infra-base.yml
