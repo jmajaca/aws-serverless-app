@@ -8,7 +8,7 @@ on:
       - "infra/**"
 
 jobs:
-  build:
+  apply:
     uses: ./.github/workflows/infra-base.yml
     with:
       mode: "apply"

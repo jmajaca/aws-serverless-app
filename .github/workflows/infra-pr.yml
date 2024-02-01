@@ -6,7 +6,7 @@ on:
       - "infra/**"
 
 jobs:
-  build:
+  plan:
     uses: ./.github/workflows/infra-base.yml
     with:
       mode: "plan"
