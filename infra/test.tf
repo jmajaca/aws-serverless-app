@@ -1,3 +1,3 @@
-local {
+locals {
   trigger = true
 }
