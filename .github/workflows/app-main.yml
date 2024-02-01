@@ -33,7 +33,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/ApplicationPipeline
-          role-session-name: pipeline-session
+          role-session-name: publish-ecr
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
@@ -50,6 +50,7 @@ jobs:
         run: |
           docker tag demo-api:latest "$REGISTRY/$REPOSITORY:$IMAGE_TAG"
           docker push "$REGISTRY/$REPOSITORY:$IMAGE_TAG"
+          docker tag demo-api:latest "$REGISTRY/$REPOSITORY:latest"
           docker push "$REGISTRY/$REPOSITORY:latest"
 
   deploy:
@@ -65,7 +66,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/ApplicationPipeline
-          role-session-name: pipeline-session
+          role-session-name: update-service
           aws-region: ${{ env.AWS_REGION }}
       
       - name: Redeploy ECS service
