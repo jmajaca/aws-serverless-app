@@ -6,6 +6,10 @@ on:
       mode:
         required: true
         type: string
+    outputs:
+      command:
+        description: "Terraform command output"
+        value: ${{ jobs.terraform.outputs.command }}
 
 defaults:
   run:
@@ -45,6 +49,8 @@ jobs:
     needs: test
     env:
       AWS_REGION: eu-central-1
+    outputs:
+      command: ${{ steps.terraform-command.outputs.output }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -68,12 +74,18 @@ jobs:
           sed -i 's|profile.*||g' "provider.tf"
 
       - name: Run terraform command
+        id: terraform-command
         run: |
           terraform init
           if [[ "${{ inputs.mode }}" == "apply" ]]; then
             terraform apply -auto-approve
+            OUTPUT="output="
           elif [[ "${{ inputs.mode }}" == "plan" ]]; then
-            terraform plan
+            OUTPUT="output=$(terraform plan)"
+            cat $OUTPUT
           else
             exit 1
           fi
+          echo 'RESULT<<EOF' >> $GITHUB_OUTPUT
+          echo $OUTPUT >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
