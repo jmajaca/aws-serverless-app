@@ -1,0 +1,3 @@
+local {
+  trigger = true
+}
