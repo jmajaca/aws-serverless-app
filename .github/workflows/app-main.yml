@@ -25,8 +25,11 @@ jobs:
       AWS_REGION: eu-central-1
     steps:
       - name: Download artifact
-        uses: actions/download-artifact@v3
+        uses: dawidd6/action-download-artifact@v3
         with:
+          workflow: app-build.yml
+          workflow_conclusion: success
+          branch: master
           name: demo-api
           path: /tmp
 
