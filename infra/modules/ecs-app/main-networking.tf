@@ -6,6 +6,8 @@ resource "aws_alb" "alb" {
   security_groups            = [aws_security_group.alb_sg.id]
   subnets                    = var.public_subnets
   drop_invalid_header_fields = true
+  # I planned on creating access logs s3 bucket but policy for it can't be dynamicly
+  # created for all regions so I gave up on the idea
 }
 
 resource "aws_alb_listener" "http_listener" {

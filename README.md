@@ -8,7 +8,7 @@ This project contains two main parts:
 
 Application is meant to be run in container so running it is easy.
 
-You need to build Docker image:
+You need to build Docker image (on `amd64` architecture):
 ```
 docker build -t demo-api app
 ```
@@ -57,8 +57,6 @@ All workflows use OpenID Connect to authenticate with the AWS. So there are no c
 | infra-pr | It uses `infra-test` and adds `plan` job for outputting changes to the infrastructure in the `pull_request` |
 | infra-main | It uses `infra-test` and adds `apply` job for provisioning infrastructure automatically on the AWS |  
 
-- about the project
-- how to build and run locally - endpoint
-- how to provision infra and how to check if app is running
-- infra graph
-- describe pipelines
+## Graphs
+
+![Networking](images/vpc.png)
