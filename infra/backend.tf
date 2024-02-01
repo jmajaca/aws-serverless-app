@@ -5,6 +5,6 @@ terraform {
     encrypt        = true
     key            = "demo-api"
     region         = "eu-central-1"
-    profile        = "personal"
+    # profile        = "personal"
   }
 }
